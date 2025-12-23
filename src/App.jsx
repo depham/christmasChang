@@ -5,6 +5,10 @@ import * as THREE from 'three';
 import { Hands } from '@mediapipe/hands';
 import * as cam from '@mediapipe/camera_utils';
 
+const IS_IOS =
+  /iPad|iPhone|iPod/.test(navigator.userAgent) &&
+  !window.MSStream;
+
 const count = 26000;
 const heartGroups = 12;
 const tempObject = new THREE.Object3D();
@@ -362,6 +366,32 @@ export default function App() {
          const dist = Math.hypot(h[4].x - h[20].x, h[4].y - h[20].y);
           setGesture(dist > 0.12 ? 'FIST' : 'OPEN'); } });
 
+    // ===== iOS FALLBACK CAMERA (ADD ONLY) =====
+if (IS_IOS && videoRef.current) {
+  navigator.mediaDevices
+    .getUserMedia({
+      video: {
+        facingMode: 'user', // camera trước iPhone
+        width: { ideal: 640 },
+        height: { ideal: 480 },
+      },
+      audio: false,
+    })
+    .then((stream) => {
+      videoRef.current.srcObject = stream;
+      videoRef.current.play();
+
+      const iosLoop = async () => {
+        if (videoRef.current) {
+          await hands.send({ image: videoRef.current });
+        }
+        requestAnimationFrame(iosLoop);
+      };
+      iosLoop();
+    })
+    .catch(console.error);
+}
+
     if (videoRef.current) {
       const camera = new cam.Camera(videoRef.current, {
         onFrame: async () => hands.send({ image: videoRef.current }),
@@ -386,7 +416,7 @@ export default function App() {
           : 'radial-white'
       }`}
     />
-      <video ref={videoRef} className="hidden" />
+      <video ref={videoRef} className="hidden" playsInline muted />
       <Canvas camera={{ position: [0, 0, 40], fov: 60 }}>
         <Particles gesture={gesture} />
         <EffectComposer>
